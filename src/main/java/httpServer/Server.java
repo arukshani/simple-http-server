@@ -11,7 +11,7 @@ import java.util.Iterator;
 
 public class Server {
 
-    public static int PORT_NUMBER = 1234;
+    private static int PORT_NUMBER = 1234;
 
     public static void main (String [] argv) throws Exception {
         new Server().go(argv);
@@ -27,6 +27,7 @@ public class Server {
 
         ServerSocketChannel serverChannel = ServerSocketChannel.open();
         ServerSocket serverSocket = serverChannel.socket();
+        serverSocket.setReceiveBufferSize(1024);
         serverSocket.bind (new InetSocketAddress (port));
         Selector selector = Selector.open();
         serverChannel.configureBlocking(false);
@@ -66,11 +67,11 @@ public class Server {
 
     protected void readDataFromSocket (SelectionKey key) throws Exception {}
 
-    protected void registerChannel (Selector selector, SelectableChannel channel, int ops) throws Exception {
+    private void registerChannel (Selector selector, SelectableChannel channel, int ops) throws Exception {
         if (channel == null) {
             return;
         }
-        channel.configureBlocking (false);
+        channel.configureBlocking(false);
         channel.register(selector, ops);
     }
 }

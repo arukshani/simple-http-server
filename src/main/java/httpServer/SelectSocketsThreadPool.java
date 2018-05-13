@@ -27,36 +27,6 @@ public class SelectSocketsThreadPool extends Server {
         worker.serviceChannel(key);
     }
 
-    private class ThreadPool {
-
-        List idle = new LinkedList();
-
-        ThreadPool(int poolSize) {
-            for (int i = 0; i < poolSize; i++) {
-                WorkerThread thread = new WorkerThread(this);
-                thread.setName("Worker" + (i + 1));
-                thread.start();
-                idle.add(thread);
-            }
-        }
-
-        WorkerThread getWorker() {
-            WorkerThread worker = null;
-            synchronized (idle) {
-                if (idle.size() > 0) {
-                    worker = (WorkerThread) idle.remove(0);
-                }
-            }
-            return (worker);
-        }
-
-        void returnWorker(WorkerThread worker) {
-            synchronized (idle) {
-                idle.add(worker);
-            }
-        }
-    }
-
     private class WorkerThread extends Thread {
         private ByteBuffer buffer = ByteBuffer.allocate(1024 * 8);
         private ThreadPool pool;
@@ -69,49 +39,60 @@ public class SelectSocketsThreadPool extends Server {
         public synchronized void run() {
             System.out.println(this.getName() + " is ready");
             while (true) {
-                try {
-                    this.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    this.interrupted();
-                }
-                if (key == null) {
+                if (waitForRequest()) {
                     continue;
                 }
                 System.out.println(this.getName() + " has been awakened");
 
-                // Read data from socket
-                try {
-                    drainChannel(key);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
                 // Check and write the response
                 try {
-                    StringBuilder inbound_content = (StringBuilder) key.attachment();
-                    if (inbound_content.toString().contains("Envelop>")) {
-                        String inbound = inbound_content.toString();
-                        System.out.println(inbound);
-
-                        responseToClient(key);
-                        responseToClient(key);
-//                        key.channel().close();
-
-                        inbound_content.delete(0, inbound_content.length() - 1);
-                    }
+                    // Read data from socket
+                    readRequest(key);
+                    respondIfRequestComplete();
                 } catch (Exception e) {
-                    System.out.println("Caught '" + e + "' closing channel");
-                    try {
-                        key.channel().close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                    key.selector().wakeup();
+                    handleError(e);
                 }
                 key = null;
                 this.pool.returnWorker(this);
             }
+        }
+
+        private void respondIfRequestComplete() {
+            StringBuilder inbound_content = (StringBuilder) key.attachment();
+            if (checkIfEndOfRequest(inbound_content)) {
+                System.out.println(inbound_content.toString());
+                inbound_content.delete(0, inbound_content.length() - 1);
+
+                respond(key);
+            }
+        }
+
+        private boolean waitForRequest() {
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                this.interrupted();
+            }
+            if (key == null) {
+                return true;
+            }
+            return false;
+        }
+
+        private void handleError(Exception e) {
+            System.out.println("Caught '" + e + "' closing channel");
+            try {
+                key.channel().close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            key.selector().wakeup();
+        }
+
+        private boolean checkIfEndOfRequest(StringBuilder inbound_content) {
+            // this only work for chunk request
+            return inbound_content.toString().matches("[.\\n\\w\\W]*0\\r\\n\\r\\n");
         }
 
         synchronized void serviceChannel(SelectionKey key) {
@@ -121,7 +102,7 @@ public class SelectSocketsThreadPool extends Server {
             // Awaken the thread
         }
 
-        void drainChannel(SelectionKey key) throws Exception {
+        void readRequest(SelectionKey key) throws Exception {
             Object o = key.attachment();
             if (o == null) {
                 key.attach(new StringBuilder());
@@ -150,7 +131,7 @@ public class SelectSocketsThreadPool extends Server {
             key.selector().wakeup();
         }
 
-        void responseToClient(SelectionKey key) {
+        void respond(SelectionKey key) {
             try {
                 ByteBuffer outbound_content = ByteBuffer.allocateDirect(PAYLOADS.PAYLOAD.getBytes("ASCII").length);
                 SocketChannel outBoundChannel = (SocketChannel) key.channel();
@@ -163,6 +144,36 @@ public class SelectSocketsThreadPool extends Server {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private class ThreadPool {
+
+        List idle = new LinkedList();
+
+        ThreadPool(int poolSize) {
+            for (int i = 0; i < poolSize; i++) {
+                WorkerThread thread = new WorkerThread(this);
+                thread.setName("Worker" + (i + 1));
+                thread.start();
+                idle.add(thread);
+            }
+        }
+
+        WorkerThread getWorker() {
+            WorkerThread worker = null;
+            synchronized (idle) {
+                if (idle.size() > 0) {
+                    worker = (WorkerThread) idle.remove(0);
+                }
+            }
+            return (worker);
+        }
+
+        void returnWorker(WorkerThread worker) {
+            synchronized (idle) {
+                idle.add(worker);
             }
         }
     }

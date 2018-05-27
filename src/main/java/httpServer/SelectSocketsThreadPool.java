@@ -13,7 +13,7 @@ public class SelectSocketsThreadPool extends Server {
 
     private ThreadPool pool = new ThreadPool(MAX_THREADS);
 
-    protected void readDataFromSocket(SelectionKey key) throws Exception {
+    protected void readDataFromSocket(SelectionKey key) throws IOException, InterruptedException {
         WorkerThread worker = pool.getWorker();
         if (worker == null) {
             Thread.sleep(1000);

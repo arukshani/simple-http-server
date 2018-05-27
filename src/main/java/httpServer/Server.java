@@ -21,7 +21,7 @@ public class Server {
         new SelectSocketsThreadPool().go(argv);
     }
 
-    void go(String [] argv) throws Exception {
+    void go(String [] argv) {
         int port = PORT_NUMBER;
         if (argv.length > 0) { // Override default listen port
             port = Integer.parseInt (argv [0]);
@@ -29,24 +29,28 @@ public class Server {
 
         System.out.println ("Listening on port " + port);
 
-        ServerSocketChannel serverChannel = ServerSocketChannel.open();
-        ServerSocket serverSocket = serverChannel.socket();
-        serverSocket.setReceiveBufferSize(SOCKET_RCV_BUFFER_SIZE);
-        serverSocket.bind (new InetSocketAddress (port));
-        Selector selector = Selector.open();
-        serverChannel.configureBlocking(false);
-        serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        try {
+            ServerSocketChannel serverChannel = ServerSocketChannel.open();
+            ServerSocket serverSocket = serverChannel.socket();
+            serverSocket.setReceiveBufferSize(SOCKET_RCV_BUFFER_SIZE);
+            serverSocket.bind(new InetSocketAddress(port));
+            Selector selector = Selector.open();
+            serverChannel.configureBlocking(false);
+            serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-        while (true) {
-            if (waitOnSelect(selector)) {
-                continue;
+            while (true) {
+                if (waitOnSelect(selector)) {
+                    continue;
+                }
+
+                handleSelectedChannels(selector);
             }
-
-            handleSelectedChannels(selector);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    private void handleSelectedChannels(Selector selector) throws Exception {
+    private void handleSelectedChannels(Selector selector) throws IOException, InterruptedException {
         Iterator it = selector.selectedKeys().iterator();
         while (it.hasNext()) {
             try {
@@ -75,9 +79,9 @@ public class Server {
         return false;
     }
 
-    protected void readDataFromSocket(SelectionKey key) throws Exception {}
+    protected void readDataFromSocket(SelectionKey key) throws IOException, InterruptedException {}
 
-    private void registerChannel(Selector selector, SelectableChannel channel, int ops) throws Exception {
+    private void registerChannel(Selector selector, SelectableChannel channel, int ops) throws IOException {
         System.out.println("registering new connection");
         if (channel == null) {
             return;

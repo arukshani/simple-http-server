@@ -73,10 +73,7 @@ public class Server {
         System.out.println("waiting on selector -----> <-----");
         int n = selector.select();
         System.out.println("returning from the select @ " + System.currentTimeMillis());
-        if (n <= 0) {
-            return true;
-        }
-        return false;
+        return n <= 0;
     }
 
     protected void readDataFromSocket(SelectionKey key) throws IOException, InterruptedException {}

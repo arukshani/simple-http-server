@@ -1,23 +1,27 @@
 package httpServer;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.Selector;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SelectableChannel;
-import java.net.ServerSocket;
-import java.net.InetSocketAddress;
 import java.util.Iterator;
 
 public class Server {
 
-    private static int PORT_NUMBER = 1234;
+    private static int PORT_NUMBER = 8080;
+    static final int MAX_THREADS = 100;
+    static final int APPLICATION_BUFFER_SIZE = 1024 * 16;
+    private static final int SOCKET_RCV_BUFFER_SIZE = 1024 * 16;
 
     public static void main (String [] argv) throws Exception {
-        new Server().go(argv);
+        new SelectSocketsThreadPool().go(argv);
     }
 
-    public void go (String [] argv) throws Exception {
+    void go(String [] argv) throws Exception {
         int port = PORT_NUMBER;
         if (argv.length > 0) { // Override default listen port
             port = Integer.parseInt (argv [0]);
@@ -27,47 +31,54 @@ public class Server {
 
         ServerSocketChannel serverChannel = ServerSocketChannel.open();
         ServerSocket serverSocket = serverChannel.socket();
-        serverSocket.setReceiveBufferSize(1024);
+        serverSocket.setReceiveBufferSize(SOCKET_RCV_BUFFER_SIZE);
         serverSocket.bind (new InetSocketAddress (port));
         Selector selector = Selector.open();
         serverChannel.configureBlocking(false);
         serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
         while (true) {
-            System.out.println("waiting on selector -----> <-----");
-
-            int n = selector.select();
-            System.out.println("returning from the select @ " + System.currentTimeMillis());
-            if (n <= 0) {
+            if (waitOnSelect(selector)) {
                 continue;
-            } else {
-                System.out.println("selector has some event");
             }
 
-            Iterator it = selector.selectedKeys().iterator();
-            while (it.hasNext()) {
-                try {
-                    SelectionKey key = (SelectionKey) it.next();
-                    if (key.isValid() && key.isAcceptable()) {
-                        ServerSocketChannel server = (ServerSocketChannel) key.channel();
-                        SocketChannel channel = server.accept();
-                        System.out.println("registering new connection");
-                        registerChannel(selector, channel, SelectionKey.OP_READ);
-                    }
-                    if (key.isValid() && key.isReadable()) {
-                        System.out.println("delegating the output to thread ...");
-                        readDataFromSocket(key);
-                    }
-                } finally {
-                    it.remove();
+            handleSelectedChannels(selector);
+        }
+    }
+
+    private void handleSelectedChannels(Selector selector) throws Exception {
+        Iterator it = selector.selectedKeys().iterator();
+        while (it.hasNext()) {
+            try {
+                SelectionKey key = (SelectionKey) it.next();
+                if (key.isValid() && key.isAcceptable()) {
+                    ServerSocketChannel server = (ServerSocketChannel) key.channel();
+                    SocketChannel channel = server.accept();
+                    registerChannel(selector, channel, SelectionKey.OP_READ);
                 }
+                if (key.isValid() && key.isReadable()) {
+                    readDataFromSocket(key);
+                }
+            } finally {
+                it.remove();
             }
         }
     }
 
-    protected void readDataFromSocket (SelectionKey key) throws Exception {}
+    private boolean waitOnSelect(Selector selector) throws IOException {
+        System.out.println("waiting on selector -----> <-----");
+        int n = selector.select();
+        System.out.println("returning from the select @ " + System.currentTimeMillis());
+        if (n <= 0) {
+            return true;
+        }
+        return false;
+    }
 
-    private void registerChannel (Selector selector, SelectableChannel channel, int ops) throws Exception {
+    protected void readDataFromSocket(SelectionKey key) throws Exception {}
+
+    private void registerChannel(Selector selector, SelectableChannel channel, int ops) throws Exception {
+        System.out.println("registering new connection");
         if (channel == null) {
             return;
         }

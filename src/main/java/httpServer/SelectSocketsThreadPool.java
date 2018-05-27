@@ -11,12 +11,7 @@ import java.util.List;
 
 public class SelectSocketsThreadPool extends Server {
 
-    private static final int MAX_THREADS = 1;
     private ThreadPool pool = new ThreadPool(MAX_THREADS);
-
-    public static void main(String[] argv) throws Exception {
-        new SelectSocketsThreadPool().go(argv);
-    }
 
     protected void readDataFromSocket(SelectionKey key) throws Exception {
         WorkerThread worker = pool.getWorker();
@@ -24,11 +19,13 @@ public class SelectSocketsThreadPool extends Server {
             Thread.sleep(1000);
             return;
         }
+
+        System.out.println("delegating the output to thread ...");
         worker.serviceChannel(key);
     }
 
     private class WorkerThread extends Thread {
-        private ByteBuffer buffer = ByteBuffer.allocate(1024 * 8);
+        private ByteBuffer buffer = ByteBuffer.allocate(APPLICATION_BUFFER_SIZE);
         private ThreadPool pool;
         private SelectionKey key;
 
@@ -57,57 +54,15 @@ public class SelectSocketsThreadPool extends Server {
             }
         }
 
-        private void respondIfRequestComplete() {
-            StringBuilder inbound_content = (StringBuilder) key.attachment();
-            if (checkIfEndOfRequest(inbound_content)) {
-                System.out.println(inbound_content.toString());
-                inbound_content.delete(0, inbound_content.length() - 1);
-
-                respond(key);
-            }
-        }
-
-        private boolean waitForRequest() {
-            try {
-                this.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                this.interrupted();
-            }
-            if (key == null) {
-                return true;
-            }
-            return false;
-        }
-
-        private void handleError(Exception e) {
-            System.out.println("Caught '" + e + "' closing channel");
-            try {
-                key.channel().close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-            key.selector().wakeup();
-        }
-
-        private boolean checkIfEndOfRequest(StringBuilder inbound_content) {
-            // this only work for chunk request
-            return inbound_content.toString().matches("[.\\n\\w\\W]*0\\r\\n\\r\\n");
-        }
-
-        synchronized void serviceChannel(SelectionKey key) {
-            this.key = key;
-            key.interestOps(key.interestOps() & (~SelectionKey.OP_READ));
-            this.notify();
-            // Awaken the thread
-        }
-
-        void readRequest(SelectionKey key) throws Exception {
+        private void readRequest(SelectionKey key) throws Exception {
             Object o = key.attachment();
             if (o == null) {
                 key.attach(new StringBuilder());
             }
             StringBuilder inbound_content = (StringBuilder) key.attachment();
+            if (inbound_content.length() > 0) {
+                inbound_content.delete(0, inbound_content.length() - 1);
+            }
 
             SocketChannel channel = (SocketChannel) key.channel();
             int count;
@@ -131,6 +86,21 @@ public class SelectSocketsThreadPool extends Server {
             key.selector().wakeup();
         }
 
+        private void respondIfRequestComplete() {
+            StringBuilder inbound_content = (StringBuilder) key.attachment();
+            if (checkIfEndOfRequest(inbound_content)) {
+                System.out.println(inbound_content.toString());
+                inbound_content.delete(0, inbound_content.length() - 1);
+
+                respond(key);
+            }
+        }
+
+        private boolean checkIfEndOfRequest(StringBuilder inbound_content) {
+            // this only work for chunk request
+            return inbound_content.toString().matches("[.\\n\\w\\W]*0\\r\\n\\r\\n");
+        }
+
         void respond(SelectionKey key) {
             try {
                 ByteBuffer outbound_content = ByteBuffer.allocateDirect(PAYLOADS.PAYLOAD.getBytes("ASCII").length);
@@ -145,6 +115,33 @@ public class SelectSocketsThreadPool extends Server {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+
+        private boolean waitForRequest() {
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                this.interrupted();
+            }
+            return key == null;
+        }
+
+        private void handleError(Exception e) {
+            System.out.println("Caught '" + e + "' closing channel");
+            try {
+                key.channel().close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            key.selector().wakeup();
+        }
+
+        synchronized void serviceChannel(SelectionKey key) {
+            this.key = key;
+            key.interestOps(key.interestOps() & (~SelectionKey.OP_READ));
+            this.notify();
+            // Awaken the thread
         }
     }
 

@@ -2,6 +2,8 @@ package httpServer;
 
 import payloads.PAYLOADS;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -57,23 +59,15 @@ public class SelectSocketsThreadPool extends Server {
         private void readRequest(SelectionKey key) throws Exception {
             Object o = key.attachment();
             if (o == null) {
-                key.attach(new StringBuilder());
+                key.attach(new StateBean());
             }
-            StringBuilder inbound_content = (StringBuilder) key.attachment();
-            if (inbound_content.length() > 0) {
-                inbound_content.delete(0, inbound_content.length() - 1);
-            }
+            StateBean stateBean = (StateBean) key.attachment();
+            StringBuilder inbound_content = stateBean.content;
+            clearExistingContent(inbound_content);
 
             SocketChannel channel = (SocketChannel) key.channel();
-            int count;
-            buffer.clear();
-            while ((count = channel.read(buffer)) > 0) {
-                buffer.flip();
-                while (buffer.hasRemaining()) {
-                    inbound_content.append((char) buffer.get());
-                }
-            }
-            buffer.clear();
+            int count = readNexContent(inbound_content, channel);
+
             if (count < 0) {
                 System.out.println("Need to close the connection");
                 channel.close();
@@ -86,8 +80,28 @@ public class SelectSocketsThreadPool extends Server {
             key.selector().wakeup();
         }
 
+        private int readNexContent(StringBuilder inbound_content, SocketChannel channel) throws IOException {
+            int count;
+            buffer.clear();
+            while ((count = channel.read(buffer)) > 0) {
+                buffer.flip();
+                while (buffer.hasRemaining()) {
+                    inbound_content.append((char) buffer.get());
+                }
+            }
+            buffer.clear();
+            return count;
+        }
+
+        private void clearExistingContent(StringBuilder inbound_content) {
+            if (inbound_content.length() > 0) {
+                inbound_content.delete(0, inbound_content.length() - 1);
+            }
+        }
+
         private void respondIfRequestComplete() {
-            StringBuilder inbound_content = (StringBuilder) key.attachment();
+            StateBean stateBean = (StateBean) key.attachment();
+            StringBuilder inbound_content = stateBean.content;
             if (checkIfEndOfRequest(inbound_content)) {
                 System.out.println(inbound_content.toString());
                 inbound_content.delete(0, inbound_content.length() - 1);
@@ -103,17 +117,53 @@ public class SelectSocketsThreadPool extends Server {
 
         void respond(SelectionKey key) {
             try {
-                ByteBuffer outbound_content = ByteBuffer.allocateDirect(PAYLOADS.PAYLOAD.getBytes("ASCII").length);
                 SocketChannel outBoundChannel = (SocketChannel) key.channel();
-                outbound_content.clear();
-                outbound_content.put(PAYLOADS.PAYLOAD.getBytes("ASCII"));
-                outbound_content.flip();
-                if (outBoundChannel.isOpen()) {
-                    outBoundChannel.write(outbound_content);
-                    outBoundChannel.socket().getOutputStream().flush();
-                }
+                writeHeaders(outBoundChannel);
+                writeBody(outBoundChannel);
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+
+        private void writeHeaders(SocketChannel outBoundChannel) throws IOException {
+            ByteBuffer outbound_header = ByteBuffer.allocateDirect(PAYLOADS.PAYLOAD_HEADERS.getBytes("ASCII").length);
+            outbound_header.clear();
+            outbound_header.put(PAYLOADS.PAYLOAD_HEADERS.getBytes("ASCII"));
+            outbound_header.flip();
+            if (outBoundChannel.isOpen()) {
+                outBoundChannel.write(outbound_header);
+                outBoundChannel.socket().getOutputStream().flush();
+            }
+        }
+
+        private void writeBody(SocketChannel outBoundChannel) throws IOException {
+            int count = 0;
+            ByteBuffer outbound_content = ByteBuffer.allocate(1024*8);
+            outbound_content.put("<a>".getBytes("ISO-8859-1"));
+            String payload = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
+            while (true) {
+                if (count != 0) {
+                    // Don't have to clear when we do it for the first time.
+                    outbound_content.clear();
+                }
+                count = count + payload.getBytes().length;
+                outbound_content.put(payload.getBytes("ISO-8859-1"));
+
+                if (outBoundChannel.isOpen()) {
+                    if (count < 500987) {
+                        outbound_content.flip();
+                        outBoundChannel.write(outbound_content);
+                        outBoundChannel.socket().getOutputStream().flush();
+                    } else {
+                        // finish sending the body
+                        outbound_content.put("</a>".getBytes());
+                        outbound_content.flip();
+                        outBoundChannel.write(outbound_content);
+                        outBoundChannel.socket().getOutputStream().flush();
+                        System.out.println(count);
+                        break;
+                    }
+                }
             }
         }
 

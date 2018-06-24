@@ -13,9 +13,9 @@ import java.util.Iterator;
 public class Server {
 
     private static int PORT_NUMBER = 8080;
-    static final int MAX_THREADS = 100;
+    static final int MAX_THREADS = 50;
     static final int APPLICATION_BUFFER_SIZE = 1024 * 16;
-    private static final int SOCKET_RCV_BUFFER_SIZE = 1024 * 16;
+    private static final int SOCKET_RCV_BUFFER_SIZE = 1024 * 2;
 
     public static void main (String [] argv) throws Exception {
         new SelectSocketsThreadPool().go(argv);

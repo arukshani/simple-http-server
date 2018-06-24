@@ -452,14 +452,12 @@ public class PAYLOADS {
 //            + "0\r\n"
 //            + "\r\n";
 //
-//    public static final String PAYLOAD_HEADERS = "HTTP/1.1 200 OK\r\n"
-//            + "Content-Type: application/xml;charset=UTF-8\r\n"
-//            + "SOAPAction: \"urn:findBenutzer\"\r\n"
-//            + "Transfer-Encoding: chunked\r\n"
-//            + "Host: wlss1h01.suvanet.ch:53203\r\n"
-//            + "Connection: Keep-Alive\r\n"
-//            + "User-Agent: Synapse-PT-HttpComponents-NIO\r\n"
-//            + "\r\n";
+    public static final String PAYLOAD_HEADERS = "HTTP/1.1 200 OK\r\n"
+            + "Content-Type: application/xml\r\n"
+            + "Content-Length: 500997\r\n"
+            + "Connection: Keep-Alive\r\n"
+            + "Server: simple-back-end\r\n"
+            + "\r\n";
 
 //        public static final String PAYLOAD = "HTTP/1.1 200 OK\r\n"
 //            + "Content-Type: application/xml;charset=UTF-8\r\n"
@@ -520,19 +518,19 @@ public class PAYLOADS {
 //    public static String CLIENT_PAYLOAD = "Envelope>";
 
 
-    public static String PAYLOAD = "HTTP/1.1 200 OK\r\n"
-            + "httpServer.Server: nginx\r\n"
-            + "Content-Type: text/xml;charset=UTF-8\r\n"
-            + "Transfer-Encoding: chunked\r\n"
-            + "Connection: Keep-Alive\r\n"
-            + "Cache-Control: no-cache\r\n"
-            + "X-Frame-Options: SAMEORIGIN\r\n"
-            + "Strict-Transport-Security: max-age=31536000;\r\n"
-            + "\r\n"
-            + "18c\r\n"
-            + "<?xml version=\"1.0\" ?><soap:Envelope xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.example.com/\"><soap:Body><tns:receive.orderResponse><Result><Code>1000</Code><Description><![CDATA[OK]]></Description></Result></tns:receive.orderResponse></soap:Body></soap:Envelope>\r\n"
-            + "0\r\n"
-            + "\r\n";
+//    public static String PAYLOAD = "HTTP/1.1 200 OK\r\n"
+//            + "httpServer.Server: nginx\r\n"
+//            + "Content-Type: text/xml;charset=UTF-8\r\n"
+//            + "Transfer-Encoding: chunked\r\n"
+//            + "Connection: Keep-Alive\r\n"
+//            + "Cache-Control: no-cache\r\n"
+//            + "X-Frame-Options: SAMEORIGIN\r\n"
+//            + "Strict-Transport-Security: max-age=31536000;\r\n"
+//            + "\r\n"
+//            + "18c\r\n"
+//            + "<?xml version=\"1.0\" ?><soap:Envelope xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.example.com/\"><soap:Body><tns:receive.orderResponse><Result><Code>1000</Code><Description><![CDATA[OK]]></Description></Result></tns:receive.orderResponse></soap:Body></soap:Envelope>\r\n"
+//            + "0\r\n"
+//            + "\r\n";
 
 //    public static String PAYLOAD = "HTTP/1.1 404 Not Found\r\n"
 //            + "httpServer.Server: nginx\r\n"
